@@ -61,67 +61,61 @@ const MapComponent = () => {
     }
   }, []);
 
-  const handleMapClick = async (e: maplibregl.MapMouseEvent) => {
-    if (!isLayerReady || !mapRef.current) {
-      console.log("Слой или карта еще не готовы для обработки кликов.");
+const handleMapClick = async (e: maplibregl.MapMouseEvent) => {
+  if (!isLayerReady || !mapRef.current) return;
+
+  const map = mapRef.current;
+  const features = map.queryRenderedFeatures(e.point, {
+    layers: ['Building 3D'],
+    radius: 5,
+  });
+
+  if (features.length) {
+    const feature = features[0];
+    let lat: number, lon: number;
+
+    if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
+      const coordinates = feature.geometry.coordinates[0][0] as [number, number];
+      [lon, lat] = coordinates;
+    } else if (feature.geometry.type === "Point") {
+      const coordinates = feature.geometry.coordinates as [number, number];
+      [lon, lat] = coordinates;
+    } else {
+      console.error("Неизвестный тип геометрии:", feature.geometry.type);
       return;
     }
 
-    const map = mapRef.current;
-    const layerId = 'Building 3D';
-    const features = map.queryRenderedFeatures(e.point, {
-      layers: [layerId]
-    });
+    try {
+      const buildingData = await fetchBuildingData(lat, lon);
 
-    if (features.length) {
-      const feature = features[0];
+      setSelectedBuilding({
+        id: feature.id,
+        name: buildingData.name || "Без названия",
+        address: buildingData.address || "Адрес неизвестен",
+        height: feature.properties.render_height || 0,
+        width: feature.properties.render_width || 0,
+        type: buildingData.type || "Тип неизвестен",
+      });
 
-      // Получение координат здания
-      let lat, lon;
-      if (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon") {
-        [lon, lat] = feature.geometry.coordinates[0][0];
-      } else if (feature.geometry.type === "Point") {
-        [lon, lat] = feature.geometry.coordinates;
-      } else {
-        console.error("Неизвестный тип геометрии:", feature.geometry.type);
-        return;
-      }
+      setHighlightedBuildingId(feature.id);
 
-      try {
-        // Запрос данных о здании через Nominatim API
-        const buildingData = await fetchBuildingData(lat, lon);
+      map.setFeatureState(
+        { source: feature.source, sourceLayer: feature.sourceLayer, id: feature.id },
+        { highlight: true }
+      );
 
-        setSelectedBuilding({
-          id: feature.id,
-          name: buildingData.name || "Без названия",
-          address: buildingData.address || "Адрес неизвестен",
-          height: feature.properties.render_height || 0, // Используем данные из feature.properties
-          width: feature.properties.render_width || 0,   // Если доступна ширина
-          type: buildingData.type || "Тип неизвестен",
-        });
+      map.setPaintProperty('Building 3D', 'fill-extrusion-color', [
+        'case',
+        ['boolean', ['feature-state', 'highlight'], false], '#ff0000',
+        '#aaa'
+      ]);
 
-        setHighlightedBuildingId(feature.id);
-
-        map.setFeatureState(
-          { source: feature.source, sourceLayer: feature.sourceLayer, id: feature.id },
-          { highlight: true }
-        );
-
-        map.setPaintProperty(layerId, 'fill-extrusion-color', [
-          'case',
-          ['boolean', ['feature-state', 'highlight'], false], '#ff0000',
-          '#aaa'
-        ]);
-
-        console.log("Здание выбрано для отображения:", buildingData);
-      } catch (error) {
-        console.error("Ошибка при получении данных о здании:", error);
-      }
-    } else {
-      console.log("Здание не найдено.");
+    } catch (error) {
+      console.error("Ошибка при получении данных о здании:", error);
     }
-  };
-
+  }
+};
+  
   useEffect(() => {
     if (isLayerReady && mapRef.current) {
       const map = mapRef.current;
