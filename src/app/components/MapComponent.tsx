@@ -70,8 +70,7 @@ const MapComponent = () => {
     const map = mapRef.current;
     const layerId = 'Building 3D';
     const features = map.queryRenderedFeatures(e.point, {
-      layers: [layerId],
-      radius: 5,
+      layers: [layerId]
     });
 
     if (features.length) {
