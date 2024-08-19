@@ -67,7 +67,7 @@ const handleMapClick = async (e: maplibregl.MapMouseEvent) => {
   const map = mapRef.current;
   const features = map.queryRenderedFeatures(e.point, {
     layers: ['Building 3D'],
-    radius: 5,
+    // radius: 5,
   });
 
   if (features.length) {
